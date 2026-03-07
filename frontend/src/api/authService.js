@@ -158,10 +158,10 @@ export const register = async (userData) => {
  * Login user (direct login)
  */
 export const login = async (email, password) => {
-  const url = `${API_BASE_URL}auth/login/`;
+  const url = `${API_BASE_URL}api/auth/login/`;
   console.log('Login request to:', url);
   
-  const response = await apiRequest('auth/login/', {
+  const response = await apiRequest('api/auth/login/', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
@@ -307,4 +307,3 @@ export const setPassword = async (token, password, passwordConfirm) => {
 
 // Export utility functions for use in other parts of the app
 export { getAccessToken, getRefreshToken, getUser, setUser, clearTokens };
-
