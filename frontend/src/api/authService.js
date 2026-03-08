@@ -3,7 +3,23 @@
  * Handles all authentication-related API calls
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://binder-backend-0szj.onrender.com/api/';
+const normalizeApiBaseUrl = (baseUrl) => {
+  const fallback = 'https://binder-backend-0szj.onrender.com/api/';
+  const raw = (baseUrl || fallback).trim().replace(/\/+$/, '');
+
+  if (raw.endsWith('/api')) {
+    return `${raw}/`;
+  }
+
+  return `${raw}/api/`;
+};
+
+const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL);
+
+const buildApiUrl = (endpoint = '') => {
+  const normalizedEndpoint = String(endpoint).replace(/^\/+/, '');
+  return `${API_BASE_URL}${normalizedEndpoint}`;
+};
 
 /**
  * Get access token from localStorage
@@ -62,7 +78,7 @@ const refreshToken = async () => {
   }
   
   try {
-    const response = await fetch(`${API_BASE_URL}auth/token/refresh/`, {
+    const response = await fetch(buildApiUrl('auth/token/refresh/'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -113,7 +129,7 @@ const apiRequest = async (endpoint, options = {}) => {
   };
   
   try {
-    const fullUrl = `${API_BASE_URL}${endpoint}`;
+    const fullUrl = buildApiUrl(endpoint);
     console.log('API Request:', fullUrl, config.method || 'GET');
     
     const response = await fetch(fullUrl, config);
@@ -158,10 +174,10 @@ export const register = async (userData) => {
  * Login user (direct login)
  */
 export const login = async (email, password) => {
-  const url = `${API_BASE_URL}api/auth/login/`;
+  const url = buildApiUrl('auth/login/');
   console.log('Login request to:', url);
   
-  const response = await apiRequest('api/auth/login/', {
+  const response = await apiRequest('auth/login/', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });

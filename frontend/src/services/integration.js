@@ -17,7 +17,23 @@
 // CONFIGURATION
 // ============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://binder-backend-0szj.onrender.com/api/';
+const normalizeApiBaseUrl = (baseUrl) => {
+  const fallback = 'https://binder-backend-0szj.onrender.com/api/';
+  const raw = (baseUrl || fallback).trim().replace(/\/+$/, '');
+
+  if (raw.endsWith('/api')) {
+    return `${raw}/`;
+  }
+
+  return `${raw}/api/`;
+};
+
+const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL);
+
+const buildApiUrl = (endpoint = '') => {
+  const normalizedEndpoint = String(endpoint).replace(/^\/+/, '');
+  return `${API_BASE_URL}${normalizedEndpoint}`;
+};
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -97,7 +113,7 @@ const apiRequest = async (endpoint, options = {}) => {
   };
   
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    const response = await fetch(buildApiUrl(endpoint), config);
     
     // Handle 401 Unauthorized - try to refresh token
     if (response.status === 401 && token) {
@@ -105,7 +121,7 @@ const apiRequest = async (endpoint, options = {}) => {
       if (refreshed) {
         // Retry request with new token
         config.headers['Authorization'] = `Bearer ${getAccessToken()}`;
-        return await fetch(`${API_BASE_URL}${endpoint}`, config);
+        return await fetch(buildApiUrl(endpoint), config);
       }
     }
     
@@ -127,7 +143,7 @@ const refreshToken = async () => {
   }
   
   try {
-    const response = await fetch(`${API_BASE_URL}auth/token/refresh/`, {
+    const response = await fetch(buildApiUrl('auth/token/refresh/'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -148,6 +164,40 @@ const refreshToken = async () => {
     clearTokens();
     return false;
   }
+};
+
+const parseApiResponse = async (response, fallbackMessage = 'Request failed') => {
+  const text = await response.text();
+  let data = {};
+
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch (parseError) {
+      const snippet = text.slice(0, 160).replace(/\s+/g, ' ').trim();
+      const error = new Error(
+        snippet
+          ? `${fallbackMessage}: server returned non-JSON response (${response.status}) - ${snippet}`
+          : `${fallbackMessage}: server returned non-JSON response (${response.status})`
+      );
+      error.status = response.status;
+      throw error;
+    }
+  }
+
+  if (!response.ok) {
+    const message =
+      data.message ||
+      data.detail ||
+      data.error ||
+      `${fallbackMessage} (HTTP ${response.status})`;
+    const error = new Error(message);
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+
+  return data;
 };
 
 // ============================================================================
@@ -658,7 +708,7 @@ export const deleteSegment = async (segmentId) => {
 export const getBuyerCodes = async (params = {}) => {
   const queryParams = new URLSearchParams(params);
   const response = await apiRequest(`ims/buyer-codes/?${queryParams}`);
-  return await response.json();
+  return await parseApiResponse(response, 'Failed to load buyer codes');
 };
 
 /**
@@ -683,7 +733,7 @@ export const createBuyerCode = async (buyerData) => {
     }),
   });
   
-  return await response.json();
+  return await parseApiResponse(response, 'Failed to create buyer code');
 };
 
 /**
